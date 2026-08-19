@@ -48,7 +48,7 @@ export async function handleInboundMessage(
   // 3.9 no named property but a date range was asked about -> search across
   // every property the host owns.
   if (range && !propertyId) {
-    await handleMultiPropertySearch(host, conversation, body, range);
+    await handleMultiPropertySearch(host, conversation, body, range, guestNameHint ?? "");
     return;
   }
 
@@ -156,8 +156,25 @@ async function handleMultiPropertySearch(
   conversation: Conversation,
   guestMessage: string,
   range: DateRange,
+  guestName: string,
 ): Promise<void> {
   const matches = await searchAvailability(host.id, range);
+
+  if (matches.length === 1) {
+    // Unambiguous — exactly one property matches, so treat it the same as
+    // the guest naming it directly: resolve the conversation to it and
+    // track a pending inquiry, instead of leaving the reply as a dead end
+    // ("sì vorrei prenotare" has nothing to attach to otherwise).
+    await setConversationProperty(conversation.id, matches[0].propertyId);
+    await createInquiry({
+      propertyId: matches[0].propertyId,
+      range,
+      guestName,
+      guestPhone: conversation.guest_phone,
+      conversationId: conversation.id,
+    });
+  }
+
   if (matches.length > 0) {
     await reply(host, conversation, await formatAvailabilityReply(guestMessage, range, matches));
     return;
