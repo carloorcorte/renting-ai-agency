@@ -32,7 +32,8 @@ export default function LoginPage() {
 
   return (
     <main className="login">
-      <form className="panel" onSubmit={onSubmit}>
+      <form className="panel login-panel" onSubmit={onSubmit}>
+        <div className="login-brand">Booking Assistant</div>
         <h1>Log in</h1>
         <label>
           Email

@@ -14,6 +14,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <div>
       <nav>
+        <span className="brand">Booking Assistant</span>
         <Link href="/dashboard">Bookings</Link>
         <Link href="/dashboard/conversations">Conversations</Link>
         <Link href="/dashboard/rules">Rules</Link>

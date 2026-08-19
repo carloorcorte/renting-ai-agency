@@ -73,11 +73,11 @@ export default function BookingsView({
         <tbody>
           {bookings.map((b) => (
             <tr key={b.id}>
-              <td>{b.property_name}</td>
-              <td>
+              <td data-label="Property">{b.property_name}</td>
+              <td data-label="Status">
                 <span className={`badge ${b.status}`}>{b.status}</span>
               </td>
-              <td>
+              <td data-label="Dates">
                 {editingId === b.id ? (
                   <EditDatesForm
                     booking={b}
@@ -91,11 +91,11 @@ export default function BookingsView({
                   `${b.checkin} → ${b.checkout}`
                 )}
               </td>
-              <td>
+              <td data-label="Guest">
                 {b.guest_name || "—"} <br />
                 <small>{b.guest_phone}</small>
               </td>
-              <td>{b.source}</td>
+              <td data-label="Source">{b.source}</td>
               <td>
                 <div className="row-actions">
                   {b.status === "inquiry" && (
@@ -123,7 +123,9 @@ export default function BookingsView({
           ))}
           {bookings.length === 0 && (
             <tr>
-              <td colSpan={6}>No bookings yet.</td>
+              <td colSpan={6} className="empty">
+                No bookings yet.
+              </td>
             </tr>
           )}
         </tbody>
