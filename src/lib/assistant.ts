@@ -111,7 +111,7 @@ async function handleSinglePropertyInquiry(
           // Someone else booked these exact dates between the rule check and
           // now — fall through to a plain availability answer instead of
           // confirming something that's no longer free.
-          await handleSinglePropertyAvailability(host, conversation, property, range);
+          await handleSinglePropertyAvailability(host, conversation, property, range, guestName);
           return;
         }
         throw err;
@@ -122,7 +122,7 @@ async function handleSinglePropertyInquiry(
   }
 
   // No rule matched — answer availability directly (deterministic, not LLM).
-  await handleSinglePropertyAvailability(host, conversation, property, range);
+  await handleSinglePropertyAvailability(host, conversation, property, range, guestName);
 }
 
 async function handleSinglePropertyAvailability(
@@ -130,10 +130,23 @@ async function handleSinglePropertyAvailability(
   conversation: Conversation,
   property: Property,
   range: DateRange,
+  guestName: string,
 ): Promise<void> {
   const available = await isPropertyAvailable(property.id, range);
+  if (available) {
+    // Track this as a pending inquiry so it shows up on the dashboard for
+    // the host to confirm/decline — nothing here blocks the dates yet, only
+    // an actual confirmation does (spec: Booking Lifecycle Status).
+    await createInquiry({
+      propertyId: property.id,
+      range,
+      guestName,
+      guestPhone: conversation.guest_phone,
+      conversationId: conversation.id,
+    });
+  }
   const message = available
-    ? `${property.name} è disponibile dal ${range.checkin} al ${range.checkout}, a ${property.price_per_night} ${property.currency}/notte.`
+    ? `${property.name} è disponibile dal ${range.checkin} al ${range.checkout}, a ${property.price_per_night} ${property.currency}/notte. Te la confermiamo a breve!`
     : `${property.name} non è disponibile dal ${range.checkin} al ${range.checkout}.`;
   await reply(host, conversation, message);
 }

@@ -1,9 +1,10 @@
 // Manual host onboarding (tasks.md 7.1) — the only step that needs code
 // rather than a plain SQL INSERT is hashing the password.
-// Usage: DATABASE_URL=... node --experimental-strip-types scripts/create-host.ts <email> <password> <name> <whatsappNumber> [notificationPhone]
+// Usage: npm run create-host -- <email> <password> <name> <whatsappNumber> [notificationPhone]
+// (reads DATABASE_URL from .env — see package.json's --env-file flag)
 //   whatsappNumber:     the new dedicated Twilio number guests text (never the host's personal number — see design.md)
 //   notificationPhone:  the host's own phone, for SMS alerts (needs-reply, upcoming check-in). Optional — omit to skip SMS alerts.
-import { hashPassword } from "../src/lib/auth.ts";
+import { hashPassword } from "../src/lib/password.ts";
 import { query } from "../src/lib/db.ts";
 
 async function main() {

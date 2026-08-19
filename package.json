@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
-    "migrate": "node --experimental-strip-types scripts/migrate.ts"
+    "migrate": "node --env-file=.env --experimental-strip-types scripts/migrate.ts",
+    "create-host": "node --env-file=.env --experimental-strip-types scripts/create-host.ts"
   },
   "dependencies": {
     "next": "^15.0.0",
