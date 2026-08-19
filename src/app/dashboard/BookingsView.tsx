@@ -13,7 +13,7 @@ async function patchBooking(id: string, patch: Record<string, unknown>): Promise
   });
   if (res.ok) return null;
   const data = await res.json().catch(() => ({}));
-  return data.error ?? "Something went wrong.";
+  return data.error ?? "Something went wrong."; 
 }
 
 export default function BookingsView({
