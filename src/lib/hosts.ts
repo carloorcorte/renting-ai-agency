@@ -1,7 +1,7 @@
 import { query, queryOne } from "./db.ts";
 import type { Host } from "./types.ts";
 
-const HOST_COLUMNS = "id, email, name, whatsapp_number, notification_phone, calendar_token";
+const HOST_COLUMNS = "id, email, name, whatsapp_number, notification_phone, calendar_token, google_calendar_id";
 
 // Narrowed return type: this query's WHERE clause guarantees a match has a
 // non-null whatsapp_number, so callers (the WhatsApp webhook path) don't
@@ -71,4 +71,48 @@ export async function findOrCreateHostByGoogle(profile: {
     [profile.email, profile.name, profile.googleId],
   );
   return created;
+}
+
+// Google Calendar push sync (separate consent from login — see
+// googleOAuth.ts / googleCalendarSync.ts) -----------------------------------
+
+/** Only the two fields a sync actually needs, and only when both are set —
+ * same narrowing pattern as getHostByEmail's password_hash. */
+export async function getHostGoogleCalendarAuth(
+  hostId: string,
+): Promise<{ google_calendar_id: string; google_calendar_refresh_token: string } | null> {
+  const row = await queryOne<{ google_calendar_id: string | null; google_calendar_refresh_token: string | null }>(
+    "SELECT google_calendar_id, google_calendar_refresh_token FROM hosts WHERE id = $1",
+    [hostId],
+  );
+  if (!row?.google_calendar_id || !row.google_calendar_refresh_token) return null;
+  return { google_calendar_id: row.google_calendar_id, google_calendar_refresh_token: row.google_calendar_refresh_token };
+}
+
+export async function connectGoogleCalendar(
+  hostId: string,
+  calendarId: string,
+  refreshToken: string,
+): Promise<void> {
+  await query("UPDATE hosts SET google_calendar_id = $1, google_calendar_refresh_token = $2 WHERE id = $3", [
+    calendarId,
+    refreshToken,
+    hostId,
+  ]);
+}
+
+/** Stops syncing but deliberately doesn't delete the Google Calendar itself
+ * — the host keeps whatever events are already there, they just stop
+ * updating. Deleting it too would be a surprising side effect of clicking
+ * "disconnect". */
+export async function disconnectGoogleCalendar(hostId: string): Promise<void> {
+  await query("UPDATE hosts SET google_calendar_id = NULL, google_calendar_refresh_token = NULL WHERE id = $1", [
+    hostId,
+  ]);
+  await query(
+    `DELETE FROM booking_calendar_events WHERE booking_id IN (
+       SELECT b.id FROM bookings b JOIN properties p ON p.id = b.property_id WHERE p.host_id = $1
+     )`,
+    [hostId],
+  );
 }
