@@ -1,4 +1,14 @@
-import { Pool, type QueryResultRow } from "pg";
+import { Pool, types, type QueryResultRow } from "pg";
+
+// pg's default parser turns a `date` column into a JS Date at UTC midnight,
+// but every DateRange in this app (dates.ts) is a plain YYYY-MM-DD string —
+// left alone, that mismatch is silent almost everywhere (Date <-> Date
+// comparisons and re-serializing a Date back into a query both happen to
+// work) until code treats the value as text, e.g. checkin.ts's
+// `${dateISO}T${time}` — then it's Date.prototype.toString() spliced into a
+// timestamp literal and Postgres rejects it. Fix once, here, instead of
+// wherever a booking's checkin/checkout is next interpolated as a string.
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 // One pool for the whole process — Next.js keeps this module cached across
 // requests in the same server instance. No ORM: the schema is small and
