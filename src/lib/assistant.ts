@@ -166,7 +166,7 @@ async function handleMultiPropertySearch(
     // track a pending inquiry, instead of leaving the reply as a dead end
     // ("sì vorrei prenotare" has nothing to attach to otherwise).
     await setConversationProperty(conversation.id, matches[0].propertyId);
-    await createInquiry({
+    await createInquiryAndSync({
       propertyId: matches[0].propertyId,
       range,
       guestName,
