@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/auth.ts";
-import { googleRedirectUri, OAUTH_STATE_COOKIE } from "@/lib/googleOAuth.ts";
+import { googleRedirectUri, LOGIN_STATE_COOKIE } from "@/lib/googleOAuth.ts";
 import { findOrCreateHostByGoogle } from "@/lib/hosts.ts";
 
 interface GoogleTokenResponse {
@@ -28,8 +28,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   const state = url.searchParams.get("state");
 
   const store = await cookies();
-  const expectedState = store.get(OAUTH_STATE_COOKIE)?.value;
-  store.delete(OAUTH_STATE_COOKIE);
+  const expectedState = store.get(LOGIN_STATE_COOKIE)?.value;
+  store.delete(LOGIN_STATE_COOKIE);
 
   if (!code || !state || !expectedState || state !== expectedState) {
     return failure(request, "google_state");
@@ -49,7 +49,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         code,
         client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: googleRedirectUri(request.url),
+        redirect_uri: googleRedirectUri(request.url, "/api/auth/google/callback"),
         grant_type: "authorization_code",
       }),
     });

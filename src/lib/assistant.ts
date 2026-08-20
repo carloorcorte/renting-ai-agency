@@ -1,5 +1,5 @@
-import { BookingConflictError, createInquiry, findAlternativeDateRanges, isPropertyAvailable, searchAvailability } from "./bookings.ts";
-import { confirmBookingAndScheduleCheckin } from "./checkin.ts";
+import { BookingConflictError, findAlternativeDateRanges, isPropertyAvailable, searchAvailability } from "./bookings.ts";
+import { confirmBookingAndScheduleCheckin, createInquiryAndSync } from "./checkin.ts";
 import { appendMessage, findOrCreateConversation, setConversationProperty, setNeedsReply } from "./conversations.ts";
 import type { DateRange } from "./dates.ts";
 import { getHostByWhatsAppNumber } from "./hosts.ts";
@@ -98,7 +98,7 @@ async function handleSinglePropertyInquiry(
   if (rule) {
     if (rule.action === "auto_confirm") {
       try {
-        const booking = await createInquiry({
+        const booking = await createInquiryAndSync({
           propertyId: property.id,
           range,
           guestName,
@@ -137,7 +137,7 @@ async function handleSinglePropertyAvailability(
     // Track this as a pending inquiry so it shows up on the dashboard for
     // the host to confirm/decline — nothing here blocks the dates yet, only
     // an actual confirmation does (spec: Booking Lifecycle Status).
-    await createInquiry({
+    await createInquiryAndSync({
       propertyId: property.id,
       range,
       guestName,
@@ -166,7 +166,7 @@ async function handleMultiPropertySearch(
     // track a pending inquiry, instead of leaving the reply as a dead end
     // ("sì vorrei prenotare" has nothing to attach to otherwise).
     await setConversationProperty(conversation.id, matches[0].propertyId);
-    await createInquiry({
+    await createInquiryAndSync({
       propertyId: matches[0].propertyId,
       range,
       guestName,

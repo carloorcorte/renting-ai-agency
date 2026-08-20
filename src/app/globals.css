@@ -589,6 +589,80 @@ button:disabled {
   margin: 0;
 }
 
+.success {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.83rem;
+  margin: 0;
+}
+
+.page-banner {
+  margin: 0 0 1.25rem;
+}
+
+/* ---------- Calendar sync panel ---------- */
+
+.sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sync-row:last-of-type {
+  border-bottom: none;
+}
+
+.sync-row p {
+  margin: 0.15rem 0 0;
+}
+
+.sync-row .oauth-button {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.secondary-button:hover {
+  background: var(--surface-alt);
+  border-color: var(--muted);
+}
+
+.sync-fallback {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.sync-fallback summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sync-fallback input {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
 .needs-reply {
   color: var(--coral);
   font-weight: 700;
@@ -842,6 +916,16 @@ button:disabled {
 
   .calendar-weekday {
     font-size: 0.6rem;
+  }
+
+  .sync-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sync-row > a,
+  .sync-row > button {
+    width: 100%;
   }
 
   nav .spacer {

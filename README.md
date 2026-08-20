@@ -88,6 +88,13 @@ ALTER TABLE hosts ALTER COLUMN whatsapp_number DROP NOT NULL;
 ALTER TABLE hosts ADD COLUMN calendar_token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text;
 ALTER TABLE hosts ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE hosts ADD COLUMN google_id TEXT UNIQUE;
+ALTER TABLE hosts ADD COLUMN IF NOT EXISTS google_calendar_id TEXT;
+ALTER TABLE hosts ADD COLUMN IF NOT EXISTS google_calendar_refresh_token TEXT;
+CREATE TABLE IF NOT EXISTS booking_calendar_events (
+    booking_id     UUID PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+    google_event_id TEXT NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ```
 
 ## Login con Google
@@ -108,6 +115,33 @@ ALTER TABLE hosts ADD COLUMN google_id TEXT UNIQUE;
 Il redirect URI usato dal codice è calcolato a runtime dall'host della
 richiesta (stesso trucco del link calendario ICS) — non serve un env var in
 più, ma deve combaciare esattamente con quanto registrato sopra.
+
+## Push automatico su Google Calendar
+
+Oltre al login, un host può cliccare "Connect Google Calendar" in dashboard
+per collegare — con un consenso OAuth separato, scope
+`calendar.app.created` — un calendario dedicato che questa app crea nel suo
+account Google. Da quel momento ogni prenotazione confermata/in attesa viene
+creata/aggiornata/cancellata lì in automatico (googleCalendarSync.ts), niente
+copia-incolla di URL.
+
+Stesso Client ID/Secret di sopra, nessuna nuova credenziale — serve solo
+aggiungere lo stesso redirect URI pattern per
+`/api/auth/google/calendar/callback` nella console Google (Authorized
+redirect URIs).
+
+**Nota sulla verifica Google**: `calendar.app.created` è uno scope "granulare"
+pensato per essere a basso rischio (l'app tocca solo calendari che ha creato
+lei, mai quelli personali dell'host), ma restando fuori dalla modalità
+"Testing" della OAuth consent screen (>100 utenti) Google può comunque
+richiedere una verifica dell'app prima di sbloccarlo per tutti. Con pochi
+host va bene anche in Testing, aggiungendoli come test user in Cloud
+Console.
+
+Apple non ha un equivalente: Sign in with Apple non concede mai accesso al
+Calendar di iCloud per app di terze parti. Per Apple resta solo il link
+`webcal://` di sottoscrizione (sempre in dashboard) — non è push automatico,
+ma è comunque un click solo, non più copia-incolla manuale.
 
 ## Test
 
