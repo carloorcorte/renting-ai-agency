@@ -12,14 +12,31 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE TABLE hosts (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email         TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
+    -- Nullable: a host who signed up via Google has no password at all,
+    -- only google_id below. verifyLogin (auth.ts) checks for null before
+    -- ever calling bcrypt.compare.
+    password_hash TEXT,
+    -- Set only for hosts created/linked through Sign in with Google.
+    google_id     TEXT UNIQUE,
     name          TEXT NOT NULL,
-    whatsapp_number TEXT NOT NULL UNIQUE, -- bare E.164 number, e.g. '+34600111222' (no 'whatsapp:' prefix)
+    -- Nullable: a self-signed-up host has no dedicated WhatsApp Business
+    -- number yet (that still requires the manual Twilio onboarding in
+    -- README.md) — they can use the dashboard, just not the WhatsApp
+    -- assistant, until one is attached. Bare E.164, e.g. '+34600111222'
+    -- (no 'whatsapp:' prefix). UNIQUE still holds: Postgres allows any
+    -- number of NULLs under a UNIQUE constraint.
+    whatsapp_number TEXT UNIQUE,
     -- Separate from whatsapp_number on purpose: that number is registered on
     -- the WhatsApp Business API and has no consumer app attached to receive
     -- a message on. Host-directed notifications go out as plain SMS to this
     -- number instead (design.md: "Messages outside the 24-hour session...").
     notification_phone TEXT,
+    -- Secret path segment for the read-only iCalendar feed
+    -- (GET /api/calendar/[token]) that Google/Apple Calendar can subscribe
+    -- to — this token IS the auth, since calendar apps can't send our
+    -- session cookie. Not a UUID for its ID meaning, just 128 bits of
+    -- unguessable text.
+    calendar_token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

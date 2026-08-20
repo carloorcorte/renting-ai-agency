@@ -2,10 +2,15 @@ export interface Host {
   id: string;
   email: string;
   name: string;
-  whatsapp_number: string;
+  /** Null until the host has a dedicated WhatsApp Business number attached
+   * (manual Twilio onboarding, see README.md) — self-signup leaves this
+   * null. */
+  whatsapp_number: string | null;
   /** Separate from whatsapp_number — that number has no consumer WhatsApp
    * app attached, so host-directed notifications go out as SMS here instead. */
   notification_phone: string | null;
+  /** Secret path segment for this host's read-only iCalendar feed. */
+  calendar_token: string;
 }
 
 export interface Property {

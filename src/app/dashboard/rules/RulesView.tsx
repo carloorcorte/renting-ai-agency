@@ -17,12 +17,12 @@ export default function RulesView({ properties }: { properties: Property[] }) {
     load(propertyId);
   }, [propertyId]);
 
-  if (properties.length === 0) return <p>No properties configured yet.</p>;
+  if (properties.length === 0) return <p className="empty-page">No properties configured yet.</p>;
 
   return (
     <>
       <h1>Auto-response rules</h1>
-      <label>
+      <label className="filter">
         Property
         <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
           {properties.map((p) => (
@@ -49,7 +49,9 @@ export default function RulesView({ properties }: { properties: Property[] }) {
           ))}
           {rules.length === 0 && (
             <tr>
-              <td colSpan={5}>No rules yet — dates being available is the only condition until you add one.</td>
+              <td colSpan={5} className="empty">
+                No rules yet — dates being available is the only condition until you add one.
+              </td>
             </tr>
           )}
         </tbody>
@@ -72,16 +74,16 @@ function RuleRow({ rule, onChanged }: { rule: Rule; onChanged: () => void }) {
 
   return (
     <tr>
-      <td>
+      <td data-label="Conditions">
         {rule.conditions.min_nights !== undefined && <div>min {rule.conditions.min_nights} nights</div>}
         {rule.conditions.min_price_per_night !== undefined && (
           <div>price ≥ {rule.conditions.min_price_per_night}</div>
         )}
         {Object.keys(rule.conditions).length === 0 && <div>dates available</div>}
       </td>
-      <td>{rule.action}</td>
-      <td>{rule.reply_template}</td>
-      <td>{rule.enabled ? "yes" : "no"}</td>
+      <td data-label="Action">{rule.action}</td>
+      <td data-label="Reply">{rule.reply_template}</td>
+      <td data-label="Enabled">{rule.enabled ? "yes" : "no"}</td>
       <td>
         <button className="secondary" onClick={toggle}>
           {rule.enabled ? "Disable" : "Enable"}

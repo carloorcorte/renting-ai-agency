@@ -10,6 +10,22 @@ export interface DateRange {
   checkout: string;
 }
 
+export function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/** Best-effort repair for a date string that isn't already YYYY-MM-DD (e.g.
+ * an LLM emitting a verbose `Date.toString()`-style value despite being
+ * asked for ISO). Relies on the JS Date parser, which only accepts
+ * unambiguous formats (ISO, RFC 2822, `Date.toString()` output) — genuinely
+ * ambiguous strings like "24/08/2026" fail to parse and return null rather
+ * than risk silently swapping day/month. */
+export function normalizeIsoDate(value: string): string | null {
+  if (isIsoDate(value)) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
 export function toPgRange(range: DateRange): string {
   return `[${range.checkin},${range.checkout})`;
 }
@@ -42,4 +58,16 @@ export function isValidRange(range: DateRange): boolean {
 
 export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** The 42 (6x7, Monday-start) YYYY-MM-DD cells of a month-grid calendar for
+ * `month` (1-12), including the leading/trailing days of neighboring months
+ * that fill out the first and last week. Pure so the dashboard's Calendar
+ * component can stay a thin rendering layer. */
+export function monthGrid(year: number, month: number): string[] {
+  const firstOfMonth = `${year}-${String(month).padStart(2, "0")}-01`;
+  // getUTCDay: 0=Sunday..6=Saturday: convert to a Monday-start offset.
+  const firstWeekday = (new Date(`${firstOfMonth}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const start = addDays(firstOfMonth, -firstWeekday);
+  return Array.from({ length: 42 }, (_, i) => addDays(start, i));
 }
