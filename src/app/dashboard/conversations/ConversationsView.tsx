@@ -24,13 +24,12 @@ export default function ConversationsView({ conversations }: { conversations: Co
   return (
     <>
       <h1>Conversations</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "1.5rem" }}>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      <div className="conversation-layout">
+        <ul className="conv-list">
           {conversations.map((c) => (
             <li key={c.id}>
               <button
-                className="secondary"
-                style={{ width: "100%", textAlign: "left", marginBottom: "0.4rem" }}
+                className={`secondary conv-item${c.id === selectedId ? " active" : ""}`}
                 onClick={() => select(c.id)}
               >
                 {c.needs_reply && <span className="needs-reply">● </span>}
@@ -38,11 +37,11 @@ export default function ConversationsView({ conversations }: { conversations: Co
               </button>
             </li>
           ))}
-          {conversations.length === 0 && <p>No conversations yet.</p>}
+          {conversations.length === 0 && <p className="empty">No conversations yet.</p>}
         </ul>
 
-        <div>
-          {!selected && <p>Select a conversation to see the full message history.</p>}
+        <div className="conversation-detail">
+          {!selected && <p className="empty">Select a conversation to see the full message history.</p>}
           {selected && (
             <>
               <h2>

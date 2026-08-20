@@ -112,7 +112,8 @@ interface DueMessageRow {
   checkout: string;
   property_name: string;
   checkin_instructions: string;
-  host_whatsapp_number: string;
+  // Null for a host who signed up but has no dedicated WhatsApp number yet.
+  host_whatsapp_number: string | null;
   host_notification_phone: string | null;
 }
 
@@ -143,8 +144,15 @@ export async function sendDueScheduledMessages(): Promise<{ sent: number; skippe
           await sendSms(row.host_notification_phone, formatHostNotification(row));
           sent++;
         }
+      } else if (!row.host_whatsapp_number) {
+        // Can't happen for a booking that came in over WhatsApp (the host
+        // number that received it obviously exists), but a manually-created
+        // booking for a self-signed-up host with no number yet can reach
+        // here — same "skip and log" treatment as the host-notify branch.
+        console.warn(`Skipping scheduled message ${row.id}: host has no whatsapp_number set.`);
+        skipped++;
       } else {
-        await sendGuestMessage(row);
+        await sendGuestMessage(row as DueMessageRow & { host_whatsapp_number: string });
         sent++;
       }
       await query("UPDATE scheduled_messages SET sent_at = now() WHERE id = $1", [row.id]);
@@ -156,7 +164,7 @@ export async function sendDueScheduledMessages(): Promise<{ sent: number; skippe
   return { sent, skipped, failed };
 }
 
-async function sendGuestMessage(row: DueMessageRow): Promise<void> {
+async function sendGuestMessage(row: DueMessageRow & { host_whatsapp_number: string }): Promise<void> {
   const contentSid = TEMPLATE_CONTENT_SID[row.type];
   if (contentSid) {
     // ponytail: variable numbering ("1", "2", ...) must match whatever the

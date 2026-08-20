@@ -60,7 +60,9 @@ export async function getCurrentHost(): Promise<Host | null> {
 
 export async function verifyLogin(email: string, password: string): Promise<Host | null> {
   const host = await getHostByEmail(email);
-  if (!host) return null;
+  // No password_hash means this account only has Google sign-in attached
+  // (see findOrCreateHostByGoogle) — nothing to compare against.
+  if (!host || !host.password_hash) return null;
   const valid = await verifyPassword(password, host.password_hash);
   return valid ? host : null;
 }

@@ -71,6 +71,44 @@ VALUES ('<host-id>', 'Casa X', 180.00, 3, 'No fumo, no feste', 'Piscina, WiFi, A
 Poi punta il numero WhatsApp dell'host verso il webhook Twilio (7.2), e
 monitora le prime conversazioni reali (7.3).
 
+Da quando esiste il signup pubblico (`/signup`), un host può anche crearsi da
+solo senza numero WhatsApp — lo aggiungi tu più tardi con un semplice
+`UPDATE hosts SET whatsapp_number = '+34...' WHERE email = '...'` quando è
+pronto l'onboarding Twilio sopra.
+
+## Aggiornare un database già esistente
+
+`npm run migrate` applica `db/schema.sql` da zero — su un database già
+popolato va a sbattere contro le tabelle esistenti (nessun framework di
+migrazioni, vedi commento in `scripts/migrate.ts`). Per portare un DB
+esistente allo schema più recente, applica a mano il diff:
+
+```sql
+ALTER TABLE hosts ALTER COLUMN whatsapp_number DROP NOT NULL;
+ALTER TABLE hosts ADD COLUMN calendar_token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text;
+ALTER TABLE hosts ALTER COLUMN password_hash DROP NOT NULL;
+ALTER TABLE hosts ADD COLUMN google_id TEXT UNIQUE;
+```
+
+## Login con Google
+
+1. [Google Cloud Console](https://console.cloud.google.com) → crea/scegli un
+   progetto → "APIs & Services" → "OAuth consent screen" (basta la
+   configurazione minima, tipo "External"/"Internal" a seconda del caso).
+2. "Credentials" → "Create Credentials" → "OAuth client ID" → tipo
+   **Web application**.
+   - **Authorized JavaScript origins**: solo schema+host, senza path —
+     `http://localhost:3000` e `https://<tuo-dominio>`.
+   - **Authorized redirect URIs**: con path completo —
+     `http://localhost:3000/api/auth/google/callback` e
+     `https://<tuo-dominio>/api/auth/google/callback`.
+3. Copia `Client ID` e `Client secret` in `.env` (`GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`).
+
+Il redirect URI usato dal codice è calcolato a runtime dall'host della
+richiesta (stesso trucco del link calendario ICS) — non serve un env var in
+più, ma deve combaciare esattamente con quanto registrato sopra.
+
 ## Test
 
 ```bash

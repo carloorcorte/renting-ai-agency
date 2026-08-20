@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AlternativeWindow } from "./bookings.ts";
-import { type DateRange, todayISO } from "./dates.ts";
+import { type DateRange, normalizeIsoDate, todayISO } from "./dates.ts";
 import type { Property, PropertyMatch } from "./types.ts";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -13,6 +13,16 @@ export interface InquiryExtraction {
   checkout: string | null; // YYYY-MM-DD
   guestPrice: number | null;
 }
+
+// Rules the extraction call must follow, beyond what the tool schema itself
+// enforces. Plain strings on purpose — a future rule is a new line here, not
+// a new abstraction. (normalizeIsoDate in dates.ts is the backstop for when
+// the model ignores the date-format rule anyway.)
+const EXTRACTION_RULES = [
+  'Resolve relative dates (e.g. "next week", "prossima settimana") against today\'s date.',
+  "Always write checkin and checkout as plain YYYY-MM-DD — never a verbose or localized date format.",
+  "Do not guess a property name that isn't in the list above.",
+];
 
 const EXTRACTION_TOOL = {
   name: "record_inquiry_details",
@@ -54,7 +64,7 @@ export async function extractInquiryDetails(
     max_tokens: 300,
     system: `Today's date is ${todayISO()}. The host's properties are: ${
       properties.map((p) => p.name).join(", ") || "(none)"
-    }. Resolve relative dates (e.g. "next week", "prossima settimana") against today's date. Call record_inquiry_details with whatever you found; use null for anything not mentioned. Do not guess a property name that isn't in the list above.`,
+    }. Call record_inquiry_details with whatever you found; use null for anything not mentioned.\n\nRules:\n${EXTRACTION_RULES.map((r) => `- ${r}`).join("\n")}`,
     messages: [{ role: "user", content: message }],
     tools: [EXTRACTION_TOOL],
     tool_choice: { type: "tool", name: "record_inquiry_details" },
@@ -65,10 +75,14 @@ export async function extractInquiryDetails(
     return { propertyName: null, checkin: null, checkout: null, guestPrice: null };
   }
   const input = block.input as Partial<InquiryExtraction>;
+  // The model is asked for YYYY-MM-DD but nothing in the tool schema enforces
+  // that — repair what's salvageable, and treat anything unparseable as "no
+  // date mentioned" rather than pass a malformed literal down to the
+  // daterange query.
   return {
     propertyName: input.propertyName ?? null,
-    checkin: input.checkin ?? null,
-    checkout: input.checkout ?? null,
+    checkin: input.checkin ? normalizeIsoDate(input.checkin) : null,
+    checkout: input.checkout ? normalizeIsoDate(input.checkout) : null,
     guestPrice: input.guestPrice ?? null,
   };
 }

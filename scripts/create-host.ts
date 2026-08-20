@@ -5,7 +5,7 @@
 //   whatsappNumber:     the new dedicated Twilio number guests text (never the host's personal number — see design.md)
 //   notificationPhone:  the host's own phone, for SMS alerts (needs-reply, upcoming check-in). Optional — omit to skip SMS alerts.
 import { hashPassword } from "../src/lib/password.ts";
-import { query } from "../src/lib/db.ts";
+import { createHost } from "../src/lib/hosts.ts";
 
 async function main() {
   const [email, password, name, whatsappNumber, notificationPhone] = process.argv.slice(2);
@@ -17,10 +17,7 @@ async function main() {
   }
 
   const passwordHash = await hashPassword(password);
-  const [host] = await query<{ id: string }>(
-    "INSERT INTO hosts (email, password_hash, name, whatsapp_number, notification_phone) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-    [email, passwordHash, name, whatsappNumber, notificationPhone ?? null],
-  );
+  const host = await createHost({ email, passwordHash, name, whatsappNumber, notificationPhone });
   console.log(`Created host ${host.id} (${email}). Add their properties directly with SQL — see README.md.`);
   process.exit(0);
 }

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
     "migrate": "node --env-file=.env --experimental-strip-types scripts/migrate.ts",
-    "create-host": "node --env-file=.env --experimental-strip-types scripts/create-host.ts"
+    "create-host": "node --env-file=.env --experimental-strip-types scripts/create-host.ts",
+    "reset-host-password": "node --env-file=.env --experimental-strip-types scripts/reset-host-password.ts"
   },
   "dependencies": {
     "next": "^15.0.0",

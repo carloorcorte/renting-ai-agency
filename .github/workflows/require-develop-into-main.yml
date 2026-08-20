@@ -1,0 +1,23 @@
+name: Require develop as source for main
+
+# GitHub branch protection has no native "only accept PRs from branch X"
+# rule, so this workflow is that rule: it fails any pull request targeting
+# the production branch whose source isn't develop. Add its job
+# (check-source-branch) as a required status check on that branch's
+# protection to actually enforce it — this check alone doesn't block
+# anything by itself.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the PR's source branch is develop
+        run: |
+          if [ "${{ github.event.pull_request.head.ref }}" != "develop" ]; then
+            echo "::error::PRs into this branch must come from develop (this one is from '${{ github.event.pull_request.head.ref }}')."
+            exit 1
+          fi

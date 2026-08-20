@@ -1,0 +1,4 @@
+# Every file needs @carloorcorte's review to merge — required by branch
+# protection's require_code_owner_reviews on develop and (once set up) the
+# production branch.
+* @carloorcorte

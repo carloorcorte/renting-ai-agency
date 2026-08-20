@@ -201,5 +201,10 @@ async function escalate(host: Host, conversation: Conversation): Promise<void> {
 // own WhatsApp number — never a hardcoded default (see lib/twilio.ts).
 async function reply(host: Host, conversation: Conversation, body: string): Promise<void> {
   await appendMessage(conversation.id, "outbound", "assistant", body);
-  await sendWhatsAppMessage(conversation.guest_phone, body, host.whatsapp_number);
+  // Every path into reply() starts from handleInboundMessage's host, which
+  // came from getHostByWhatsAppNumber — that lookup only ever matches a host
+  // whose whatsapp_number equals the number this message arrived on, so it
+  // can't be null here even though Host's type allows it in general
+  // (self-signed-up hosts with no number yet never reach this function).
+  await sendWhatsAppMessage(conversation.guest_phone, body, host.whatsapp_number!);
 }
