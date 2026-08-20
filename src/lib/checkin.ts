@@ -1,6 +1,7 @@
-import { cancelBooking, confirmBooking, createManualBooking, editBookingDates } from "./bookings.ts";
+import { cancelBooking, confirmBooking, createInquiry, createManualBooking, declineBooking, editBookingDates } from "./bookings.ts";
 import { query, queryOne } from "./db.ts";
 import type { DateRange } from "./dates.ts";
+import { syncBookingCalendar } from "./googleCalendarSync.ts";
 import { sendSms, sendWhatsAppMessage, sendWhatsAppTemplate } from "./twilio.ts";
 import type { Booking, Property } from "./types.ts";
 
@@ -45,13 +46,17 @@ async function clearSchedule(bookingId: string): Promise<void> {
   await query("DELETE FROM checkin_appointments WHERE booking_id = $1", [bookingId]);
 }
 
-// Wrappers that keep booking-management (bookings.ts) and checkin-scheduling
-// in sync, so every call site (rule engine, dashboard routes) gets both
-// behaviors for free instead of having to remember to call both.
+// Wrappers that keep booking-management (bookings.ts), checkin-scheduling,
+// and Google Calendar sync all in sync, so every call site (rule engine,
+// dashboard routes, the WhatsApp assistant) gets all three behaviors for
+// free instead of having to remember to call each one. syncBookingCalendar
+// re-reads the booking's fresh state itself, so it's always called last and
+// unconditionally — it no-ops on its own if the host isn't connected.
 
 export async function confirmBookingAndScheduleCheckin(bookingId: string): Promise<Booking> {
   const booking = await confirmBooking(bookingId);
   await scheduleCheckinIfConfirmed(booking);
+  await syncBookingCalendar(booking.id);
   return booking;
 }
 
@@ -60,12 +65,14 @@ export async function createManualBookingAndScheduleCheckin(
 ): Promise<Booking> {
   const booking = await createManualBooking(input);
   await scheduleCheckinIfConfirmed(booking);
+  await syncBookingCalendar(booking.id);
   return booking;
 }
 
 export async function editBookingDatesAndReschedule(bookingId: string, newRange: DateRange): Promise<Booking> {
   const booking = await editBookingDates(bookingId, newRange);
   await scheduleCheckinIfConfirmed(booking);
+  await syncBookingCalendar(booking.id);
   return booking;
 }
 
@@ -73,6 +80,23 @@ export async function editBookingDatesAndReschedule(bookingId: string, newRange:
 export async function cancelBookingAndClearSchedule(bookingId: string): Promise<Booking> {
   const booking = await cancelBooking(bookingId);
   await clearSchedule(bookingId);
+  await syncBookingCalendar(booking.id);
+  return booking;
+}
+
+// The two bookings.ts entry points below have no other side effect to wrap
+// (no checkin to schedule) — they exist purely so calendar sync isn't
+// something every call site has to remember on its own.
+
+export async function createInquiryAndSync(input: Parameters<typeof createInquiry>[0]): Promise<Booking> {
+  const booking = await createInquiry(input);
+  await syncBookingCalendar(booking.id);
+  return booking;
+}
+
+export async function declineBookingAndSync(bookingId: string): Promise<Booking> {
+  const booking = await declineBooking(bookingId);
+  await syncBookingCalendar(booking.id);
   return booking;
 }
 

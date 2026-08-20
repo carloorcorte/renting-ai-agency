@@ -37,6 +37,14 @@ CREATE TABLE hosts (
     -- session cookie. Not a UUID for its ID meaning, just 128 bits of
     -- unguessable text.
     calendar_token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
+    -- Set once a host clicks "Connect Google Calendar" (separate consent
+    -- from login — see googleOAuth.ts). google_calendar_id is a *dedicated*
+    -- calendar this app creates in their Google account (scope
+    -- calendar.app.created: we only ever touch calendars/events we made,
+    -- never their personal ones). The refresh token is what lets background
+    -- syncs push/update/delete events without the host being present.
+    google_calendar_id           TEXT,
+    google_calendar_refresh_token TEXT,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -96,6 +104,15 @@ ALTER TABLE bookings
 
 CREATE INDEX bookings_property_id_idx ON bookings(property_id);
 CREATE INDEX bookings_property_status_idx ON bookings(property_id, status);
+
+-- One row per booking that's ever been pushed to a host's connected Google
+-- Calendar — lets syncBookingCalendar (googleCalendarSync.ts) know whether
+-- to create vs PATCH vs DELETE the corresponding event.
+CREATE TABLE booking_calendar_events (
+    booking_id     UUID PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+    google_event_id TEXT NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- 2.4 conversations and messages ------------------------------------------
 

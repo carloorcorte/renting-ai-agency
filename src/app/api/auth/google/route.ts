@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { googleRedirectUri, OAUTH_STATE_COOKIE } from "@/lib/googleOAuth.ts";
+import { googleRedirectUri, LOGIN_STATE_COOKIE } from "@/lib/googleOAuth.ts";
 
 // 1/2 of Sign in with Google: send the browser to Google's consent screen.
 // See README.md "Login con Google" for the one-time Cloud Console setup.
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const state = randomBytes(16).toString("hex");
   const store = await cookies();
-  store.set(OAUTH_STATE_COOKIE, state, {
+  store.set(LOGIN_STATE_COOKIE, state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", googleRedirectUri(request.url));
+  url.searchParams.set("redirect_uri", googleRedirectUri(request.url, "/api/auth/google/callback"));
   url.searchParams.set("response_type", "code");
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("state", state);
