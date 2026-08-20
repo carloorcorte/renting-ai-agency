@@ -1,6 +1,12 @@
 import { BookingConflictError, findAlternativeDateRanges, isPropertyAvailable, searchAvailability } from "./bookings.ts";
 import { confirmBookingAndScheduleCheckin, createInquiryAndSync } from "./checkin.ts";
-import { appendMessage, findOrCreateConversation, setConversationProperty, setNeedsReply } from "./conversations.ts";
+import {
+  appendMessage,
+  findOrCreateConversation,
+  getMessagesForConversation,
+  setConversationProperty,
+  setNeedsReply,
+} from "./conversations.ts";
 import type { DateRange } from "./dates.ts";
 import { getHostByWhatsAppNumber } from "./hosts.ts";
 import { answerFaqFallback, extractInquiryDetails, formatAlternativesReply, formatAvailabilityReply } from "./llm.ts";
@@ -27,10 +33,14 @@ export async function handleInboundMessage(
   }
 
   const conversation = await findOrCreateConversation(host.id, guestPhone);
+  // Fetched before appendMessage so it doesn't include the message we're
+  // about to extract from — last 10 is plenty for a booking inquiry thread
+  // and keeps the extraction call's token cost bounded.
+  const history = (await getMessagesForConversation(conversation.id)).slice(-10);
   await appendMessage(conversation.id, "inbound", "guest", body);
 
   const properties = await getPropertiesForHost(host.id);
-  const extraction = await extractInquiryDetails(body, properties);
+  const extraction = await extractInquiryDetails(body, properties, history);
 
   // 3.2 resolve which property (if any) this message is about.
   let propertyId = conversation.property_id;
