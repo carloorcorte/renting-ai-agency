@@ -1,15 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
+import { googleErrorMessage } from "../authErrors.ts";
 
-// 6.1 — manual account creation only, no public signup: this form only logs
-// in an already-created host.
+// useSearchParams (for the Google-callback ?error=...) needs a Suspense
+// boundary or Next.js can't statically render this page.
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => googleErrorMessage(searchParams.get("error")));
   const [submitting, setSubmitting] = useState(false);
 
   async function onSubmit(event: FormEvent) {
@@ -47,6 +58,13 @@ export default function LoginPage() {
         <button type="submit" disabled={submitting}>
           {submitting ? "Logging in…" : "Log in"}
         </button>
+        <div className="auth-divider">or</div>
+        <a className="oauth-button" href="/api/auth/google">
+          Continue with Google
+        </a>
+        <p className="auth-switch">
+          No account yet? <Link href="/signup">Sign up</Link>
+        </p>
       </form>
     </main>
   );
