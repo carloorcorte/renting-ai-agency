@@ -1,5 +1,5 @@
 import { query, queryOne } from "./db.ts";
-import type { Conversation, Message, MessageDirection, MessageSender } from "./types.ts";
+import type { Conversation, Message, MessageDirection, MessageSender, PendingProposal } from "./types.ts";
 
 // 3.2 resolve/create the conversation for a (host, guest) pair.
 export async function findOrCreateConversation(hostId: string, guestPhone: string): Promise<Conversation> {
@@ -19,6 +19,15 @@ export async function setConversationProperty(conversationId: string, propertyId
   await query("UPDATE conversations SET property_id = $2, updated_at = now() WHERE id = $1", [
     conversationId,
     propertyId,
+  ]);
+}
+
+/** null clears it — used both when proposing a new summary (overwrites any
+ * stale one) and once the guest has confirmed/declined it. */
+export async function setPendingProposal(conversationId: string, proposal: PendingProposal | null): Promise<void> {
+  await query("UPDATE conversations SET pending_proposal = $2, updated_at = now() WHERE id = $1", [
+    conversationId,
+    proposal ? JSON.stringify(proposal) : null,
   ]);
 }
 

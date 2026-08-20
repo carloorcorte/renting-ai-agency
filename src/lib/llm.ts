@@ -12,6 +12,7 @@ export interface InquiryExtraction {
   checkin: string | null; // YYYY-MM-DD
   checkout: string | null; // YYYY-MM-DD
   guestPrice: number | null;
+  guestCount: number | null;
 }
 
 // Rules the extraction call must follow, beyond what the tool schema itself
@@ -29,6 +30,7 @@ const EXTRACTION_RULES = [
   // dropping the guest into the FAQ fallback, which has no way to act on
   // "book it."
   "If the guest is confirming or agreeing without restating dates (e.g. \"prenoto\", \"va bene\", \"sì\", \"confermo\"), resolve checkin/checkout/propertyName from whatever was already established earlier in this conversation, not null.",
+  "guestCount also carries forward the same way — if it was mentioned earlier in the conversation and not contradicted since, reuse it rather than returning null.",
 ];
 
 const EXTRACTION_TOOL = {
@@ -52,6 +54,10 @@ const EXTRACTION_TOOL = {
       guestPrice: {
         type: ["number", "null"],
         description: "A per-night price the guest explicitly proposed or asked for, or null.",
+      },
+      guestCount: {
+        type: ["number", "null"],
+        description: "Number of guests, if the guest stated one (e.g. \"saremmo in 7\", \"siamo 4 persone\"), else null.",
       },
     },
     required: [],
@@ -90,7 +96,7 @@ export async function extractInquiryDetails(
 
   const block = response.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") {
-    return { propertyName: null, checkin: null, checkout: null, guestPrice: null };
+    return { propertyName: null, checkin: null, checkout: null, guestPrice: null, guestCount: null };
   }
   const input = block.input as Partial<InquiryExtraction>;
   // The model is asked for YYYY-MM-DD but nothing in the tool schema enforces
@@ -102,6 +108,7 @@ export async function extractInquiryDetails(
     checkin: input.checkin ? normalizeIsoDate(input.checkin) : null,
     checkout: input.checkout ? normalizeIsoDate(input.checkout) : null,
     guestPrice: input.guestPrice ?? null,
+    guestCount: input.guestCount ?? null,
   };
 }
 

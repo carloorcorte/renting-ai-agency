@@ -6,14 +6,16 @@ import {
   getMessagesForConversation,
   setConversationProperty,
   setNeedsReply,
+  setPendingProposal,
 } from "./conversations.ts";
-import type { DateRange } from "./dates.ts";
+import { type DateRange, nights } from "./dates.ts";
+import { isConfirmation, isDecline } from "./guestReply.ts";
 import { getHostByWhatsAppNumber } from "./hosts.ts";
 import { answerFaqFallback, extractInquiryDetails, formatAlternativesReply, formatAvailabilityReply } from "./llm.ts";
-import { getPropertiesForHost } from "./properties.ts";
+import { getProperty, getPropertiesForHost } from "./properties.ts";
 import { evaluateRules } from "./rules.ts";
 import { sendSms, sendWhatsAppMessage, stripWhatsAppPrefix } from "./twilio.ts";
-import type { Conversation, Host, Property } from "./types.ts";
+import type { Conversation, Host, PendingProposal, Property } from "./types.ts";
 
 // 3.1–3.9 orchestrates one inbound WhatsApp message end to end. Called by the
 // webhook route after Twilio's signature has been verified.
@@ -39,6 +41,23 @@ export async function handleInboundMessage(
   const history = (await getMessagesForConversation(conversation.id)).slice(-10);
   await appendMessage(conversation.id, "inbound", "guest", body);
 
+  // A summary was already sent and is waiting on a plain yes/no — decided
+  // by keyword match, not the LLM (design.md: only deterministic code may
+  // trigger a booking). Anything that isn't a clear yes/no falls through to
+  // the normal flow below (the guest might be asking something else, or
+  // changing the request instead of answering it).
+  if (conversation.pending_proposal) {
+    if (isDecline(body)) {
+      await setPendingProposal(conversation.id, null);
+      await reply(host, conversation, "Nessun problema! Se hai altre domande o cambi idea, sono qui. 😊");
+      return;
+    }
+    if (isConfirmation(body)) {
+      await finalizeProposal(host, conversation, conversation.pending_proposal, guestNameHint ?? "");
+      return;
+    }
+  }
+
   const properties = await getPropertiesForHost(host.id);
   const extraction = await extractInquiryDetails(body, properties, history);
 
@@ -58,7 +77,7 @@ export async function handleInboundMessage(
   // 3.9 no named property but a date range was asked about -> search across
   // every property the host owns.
   if (range && !propertyId) {
-    await handleMultiPropertySearch(host, conversation, body, range, guestNameHint ?? "");
+    await handleMultiPropertySearch(host, conversation, body, range, extraction.guestCount);
     return;
   }
 
@@ -81,6 +100,7 @@ export async function handleInboundMessage(
       property,
       range,
       extraction.guestPrice ?? undefined,
+      extraction.guestCount,
       guestNameHint ?? "",
     );
     return;
@@ -101,9 +121,13 @@ async function handleSinglePropertyInquiry(
   property: Property,
   range: DateRange,
   guestPrice: number | undefined,
+  guestCount: number | null,
   guestName: string,
 ): Promise<void> {
-  // 3.3 rules run first, deterministically, before anything else.
+  // 3.3 rules run first, deterministically, before anything else. A host's
+  // own auto_confirm rule is a deliberate opt-in to zero-friction instant
+  // booking, so it deliberately skips the propose-then-confirm step below —
+  // that step is the *default* behavior, not one every path goes through.
   const rule = await evaluateRules(property, range, guestPrice);
   if (rule) {
     if (rule.action === "auto_confirm") {
@@ -121,7 +145,7 @@ async function handleSinglePropertyInquiry(
           // Someone else booked these exact dates between the rule check and
           // now — fall through to a plain availability answer instead of
           // confirming something that's no longer free.
-          await handleSinglePropertyAvailability(host, conversation, property, range, guestName);
+          await handleSinglePropertyAvailability(host, conversation, property, range, guestCount);
           return;
         }
         throw err;
@@ -132,7 +156,7 @@ async function handleSinglePropertyInquiry(
   }
 
   // No rule matched — answer availability directly (deterministic, not LLM).
-  await handleSinglePropertyAvailability(host, conversation, property, range, guestName);
+  await handleSinglePropertyAvailability(host, conversation, property, range, guestCount);
 }
 
 async function handleSinglePropertyAvailability(
@@ -140,25 +164,76 @@ async function handleSinglePropertyAvailability(
   conversation: Conversation,
   property: Property,
   range: DateRange,
-  guestName: string,
+  guestCount: number | null,
 ): Promise<void> {
   const available = await isPropertyAvailable(property.id, range);
-  if (available) {
-    // Track this as a pending inquiry so it shows up on the dashboard for
-    // the host to confirm/decline — nothing here blocks the dates yet, only
-    // an actual confirmation does (spec: Booking Lifecycle Status).
+  if (!available) {
+    await reply(host, conversation, `${property.name} non è disponibile dal ${range.checkin} al ${range.checkout}.`);
+    return;
+  }
+  await proposeBooking(host, conversation, property, range, guestCount);
+}
+
+// Nothing is booked yet — just a summary held on the conversation
+// (pending_proposal) until the guest replies yes/no (see the gate at the
+// top of handleInboundMessage). Requested by a host after watching a real
+// conversation where "Prenoto" silently created an inquiry with no
+// guest-facing total price or explicit confirmation step.
+async function proposeBooking(
+  host: Host,
+  conversation: Conversation,
+  property: Property,
+  range: DateRange,
+  guestCount: number | null,
+): Promise<void> {
+  const tripNights = nights(range);
+  const totalPrice = (Number(property.price_per_night) * tripNights).toFixed(2);
+  const proposal: PendingProposal = { propertyId: property.id, checkin: range.checkin, checkout: range.checkout, guestCount, totalPrice };
+  await setPendingProposal(conversation.id, proposal);
+
+  const guestLine = guestCount ? `👥 ${guestCount} ospiti\n` : "";
+  const message =
+    `Ecco il riepilogo:\n` +
+    `🏠 ${property.name}\n${guestLine}` +
+    `📅 ${range.checkin} → ${range.checkout} (${tripNights} nott${tripNights === 1 ? "e" : "i"})\n` +
+    `💰 Totale: ${totalPrice} ${property.currency}\n\n` +
+    `Confermi la prenotazione? Rispondi "sì" per confermare.`;
+  await reply(host, conversation, message);
+}
+
+// Called once the guest has said yes to a pending proposal — the only place
+// createInquiryAndSync gets called for the "no rule matched" path.
+async function finalizeProposal(
+  host: Host,
+  conversation: Conversation,
+  proposal: PendingProposal,
+  guestName: string,
+): Promise<void> {
+  await setPendingProposal(conversation.id, null);
+  const range: DateRange = { checkin: proposal.checkin, checkout: proposal.checkout };
+  try {
     await createInquiryAndSync({
-      propertyId: property.id,
+      propertyId: proposal.propertyId,
       range,
       guestName,
       guestPhone: conversation.guest_phone,
       conversationId: conversation.id,
     });
+    await reply(host, conversation, "🎉 Prenotazione registrata! Te la confermiamo a breve.");
+  } catch (err) {
+    if (err instanceof BookingConflictError) {
+      // Someone else booked these exact dates between the proposal and this
+      // confirmation — tell the guest plainly instead of pretending it went
+      // through.
+      await reply(
+        host,
+        conversation,
+        "Ci dispiace, nel frattempo quelle date sono state prenotate da qualcun altro. Vuoi che controlliamo altre date?",
+      );
+      return;
+    }
+    throw err;
   }
-  const message = available
-    ? `${property.name} è disponibile dal ${range.checkin} al ${range.checkout}, a ${property.price_per_night} ${property.currency}/notte. Te la confermiamo a breve!`
-    : `${property.name} non è disponibile dal ${range.checkin} al ${range.checkout}.`;
-  await reply(host, conversation, message);
 }
 
 async function handleMultiPropertySearch(
@@ -166,23 +241,20 @@ async function handleMultiPropertySearch(
   conversation: Conversation,
   guestMessage: string,
   range: DateRange,
-  guestName: string,
+  guestCount: number | null,
 ): Promise<void> {
   const matches = await searchAvailability(host.id, range);
 
   if (matches.length === 1) {
     // Unambiguous — exactly one property matches, so treat it the same as
     // the guest naming it directly: resolve the conversation to it and
-    // track a pending inquiry, instead of leaving the reply as a dead end
-    // ("sì vorrei prenotare" has nothing to attach to otherwise).
+    // propose the booking instead of just listing "one option."
     await setConversationProperty(conversation.id, matches[0].propertyId);
-    await createInquiryAndSync({
-      propertyId: matches[0].propertyId,
-      range,
-      guestName,
-      guestPhone: conversation.guest_phone,
-      conversationId: conversation.id,
-    });
+    const property = await getProperty(matches[0].propertyId);
+    if (property) {
+      await proposeBooking(host, conversation, property, range, guestCount);
+      return;
+    }
   }
 
   if (matches.length > 0) {
