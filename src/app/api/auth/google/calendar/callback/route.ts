@@ -13,7 +13,7 @@ interface GoogleTokenResponse {
 }
 
 function failure(request: Request, reason: string): NextResponse {
-  return NextResponse.redirect(new URL(`/dashboard?calendarError=${reason}`, request.url));
+  return NextResponse.redirect(new URL(`/dashboard/settings?calendarError=${reason}`, request.url));
 }
 
 // 2/2: exchange the code for a refresh token, create the dedicated calendar,
@@ -66,7 +66,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (b.status === "confirmed" || b.status === "inquiry") await syncBookingCalendar(b.id);
     }
 
-    return NextResponse.redirect(new URL("/dashboard?calendarConnected=1", request.url));
+    return NextResponse.redirect(new URL("/dashboard/settings?calendarConnected=1", request.url));
   } catch (err) {
     console.error("Google Calendar connect failed:", err);
     return failure(request, "unknown");
