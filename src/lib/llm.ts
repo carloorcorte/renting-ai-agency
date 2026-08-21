@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AlternativeWindow } from "./bookings.ts";
 import { type DateRange, normalizeIsoDate, todayISO } from "./dates.ts";
-import type { Property, PropertyMatch } from "./types.ts";
+import type { Message, Property, PropertyMatch } from "./types.ts";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Small/cheap model: both jobs below are short, grounded, single-turn tasks.
@@ -12,6 +12,7 @@ export interface InquiryExtraction {
   checkin: string | null; // YYYY-MM-DD
   checkout: string | null; // YYYY-MM-DD
   guestPrice: number | null;
+  guestCount: number | null;
 }
 
 // Rules the extraction call must follow, beyond what the tool schema itself
@@ -22,6 +23,14 @@ const EXTRACTION_RULES = [
   'Resolve relative dates (e.g. "next week", "prossima settimana") against today\'s date.',
   "Always write checkin and checkout as plain YYYY-MM-DD — never a verbose or localized date format.",
   "Do not guess a property name that isn't in the list above.",
+  // Found via a real conversation: a bare confirmation like "prenoto"/"va
+  // bene"/"sì" has no date in the CURRENT message, but the conversation
+  // history (passed below) may already establish which dates and property
+  // are being confirmed — reuse those rather than returning null and
+  // dropping the guest into the FAQ fallback, which has no way to act on
+  // "book it."
+  "If the guest is confirming or agreeing without restating dates (e.g. \"prenoto\", \"va bene\", \"sì\", \"confermo\"), resolve checkin/checkout/propertyName from whatever was already established earlier in this conversation, not null.",
+  "guestCount also carries forward the same way — if it was mentioned earlier in the conversation and not contradicted since, reuse it rather than returning null.",
 ];
 
 const EXTRACTION_TOOL = {
@@ -46,6 +55,10 @@ const EXTRACTION_TOOL = {
         type: ["number", "null"],
         description: "A per-night price the guest explicitly proposed or asked for, or null.",
       },
+      guestCount: {
+        type: ["number", "null"],
+        description: "Number of guests, if the guest stated one (e.g. \"saremmo in 7\", \"siamo 4 persone\"), else null.",
+      },
     },
     required: [],
   },
@@ -55,9 +68,17 @@ const EXTRACTION_TOOL = {
 // flow acts on. This never decides availability or bookings — it only reads
 // the guest's words; the database stays the source of truth for what's
 // actually free (design.md: deterministic queries, not LLM guesses).
+//
+// `history` is the conversation so far (oldest first), excluding the new
+// message — without it, every message is read in total isolation, so a
+// natural follow-up like "prenoto" (referring to dates discussed two
+// messages ago) extracts as "no date mentioned" and the flow can't act on
+// it. ponytail: unbounded — pass the caller's own recent-messages slice if a
+// conversation ever gets long enough for this to matter for cost/latency.
 export async function extractInquiryDetails(
   message: string,
   properties: Pick<Property, "name">[],
+  history: Pick<Message, "direction" | "body">[] = [],
 ): Promise<InquiryExtraction> {
   const response = await client.messages.create({
     model: MODEL,
@@ -65,14 +86,17 @@ export async function extractInquiryDetails(
     system: `Today's date is ${todayISO()}. The host's properties are: ${
       properties.map((p) => p.name).join(", ") || "(none)"
     }. Call record_inquiry_details with whatever you found; use null for anything not mentioned.\n\nRules:\n${EXTRACTION_RULES.map((r) => `- ${r}`).join("\n")}`,
-    messages: [{ role: "user", content: message }],
+    messages: [
+      ...history.map((m) => ({ role: m.direction === "inbound" ? ("user" as const) : ("assistant" as const), content: m.body })),
+      { role: "user", content: message },
+    ],
     tools: [EXTRACTION_TOOL],
     tool_choice: { type: "tool", name: "record_inquiry_details" },
   });
 
   const block = response.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") {
-    return { propertyName: null, checkin: null, checkout: null, guestPrice: null };
+    return { propertyName: null, checkin: null, checkout: null, guestPrice: null, guestCount: null };
   }
   const input = block.input as Partial<InquiryExtraction>;
   // The model is asked for YYYY-MM-DD but nothing in the tool schema enforces
@@ -84,6 +108,7 @@ export async function extractInquiryDetails(
     checkin: input.checkin ? normalizeIsoDate(input.checkin) : null,
     checkout: input.checkout ? normalizeIsoDate(input.checkout) : null,
     guestPrice: input.guestPrice ?? null,
+    guestCount: input.guestCount ?? null,
   };
 }
 

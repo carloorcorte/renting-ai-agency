@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS booking_calendar_events (
     google_event_id TEXT NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pending_proposal JSONB;
 ```
 
 ## Login con Google

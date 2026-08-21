@@ -52,12 +52,23 @@ export interface Booking {
   created_at: string;
 }
 
+/** A booking summary already sent to the guest, awaiting a plain yes/no
+ * reply (guestReply.ts) before createInquiryAndSync is ever called. */
+export interface PendingProposal {
+  propertyId: string;
+  checkin: string;
+  checkout: string;
+  guestCount: number | null;
+  totalPrice: string;
+}
+
 export interface Conversation {
   id: string;
   host_id: string;
   property_id: string | null;
   guest_phone: string;
   needs_reply: boolean;
+  pending_proposal: PendingProposal | null;
   created_at: string;
   updated_at: string;
 }

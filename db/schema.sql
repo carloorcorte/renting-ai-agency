@@ -122,6 +122,10 @@ CREATE TABLE conversations (
     property_id UUID REFERENCES properties(id) ON DELETE SET NULL, -- null until resolved
     guest_phone TEXT NOT NULL,
     needs_reply BOOLEAN NOT NULL DEFAULT false,
+    -- A booking summary already sent to the guest, awaiting a plain yes/no
+    -- reply before anything is actually created — see guestReply.ts.
+    -- {propertyId, checkin, checkout, guestCount, totalPrice} or null.
+    pending_proposal JSONB,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
