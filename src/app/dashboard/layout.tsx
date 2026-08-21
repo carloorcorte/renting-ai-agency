@@ -20,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <Link href="/dashboard/conversations">Conversations</Link>
         <Link href="/dashboard/rules">Rules</Link>
         <span className="spacer" />
+        <Link href="/dashboard/settings">Settings</Link>
         <span className="host-name">{host.name}</span>
         <LogoutButton />
       </nav>

@@ -9,8 +9,6 @@ export interface Host {
   /** Separate from whatsapp_number — that number has no consumer WhatsApp
    * app attached, so host-directed notifications go out as SMS here instead. */
   notification_phone: string | null;
-  /** Secret path segment for this host's read-only iCalendar feed. */
-  calendar_token: string;
   /** Id of the dedicated Google Calendar this app created for the host, once
    * they've connected one (googleCalendarSync.ts) — null if not connected.
    * The refresh token that goes with it is deliberately NOT on this type,

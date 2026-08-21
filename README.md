@@ -119,12 +119,11 @@ più, ma deve combaciare esattamente con quanto registrato sopra.
 
 ## Push automatico su Google Calendar
 
-Oltre al login, un host può cliccare "Connect Google Calendar" in dashboard
-per collegare — con un consenso OAuth separato, scope
+Da `/dashboard/settings`, un host può cliccare "Connect Google Calendar" per
+collegare — con un consenso OAuth separato dal login, scope
 `calendar.app.created` — un calendario dedicato che questa app crea nel suo
 account Google. Da quel momento ogni prenotazione confermata/in attesa viene
-creata/aggiornata/cancellata lì in automatico (googleCalendarSync.ts), niente
-copia-incolla di URL.
+creata/aggiornata/cancellata lì in automatico (googleCalendarSync.ts).
 
 Stesso Client ID/Secret di sopra, nessuna nuova credenziale — serve solo
 aggiungere lo stesso redirect URI pattern per
@@ -139,10 +138,9 @@ richiedere una verifica dell'app prima di sbloccarlo per tutti. Con pochi
 host va bene anche in Testing, aggiungendoli come test user in Cloud
 Console.
 
-Apple non ha un equivalente: Sign in with Apple non concede mai accesso al
-Calendar di iCloud per app di terze parti. Per Apple resta solo il link
-`webcal://` di sottoscrizione (sempre in dashboard) — non è push automatico,
-ma è comunque un click solo, non più copia-incolla manuale.
+Niente equivalente per Apple Calendar (Sign in with Apple non concede mai
+accesso al Calendar di iCloud per app di terze parti) — la feature è stata
+rimossa insieme al feed ICS che la sosteneva, invece di tenere una via a metà.
 
 ## Test
 

@@ -31,12 +31,6 @@ CREATE TABLE hosts (
     -- a message on. Host-directed notifications go out as plain SMS to this
     -- number instead (design.md: "Messages outside the 24-hour session...").
     notification_phone TEXT,
-    -- Secret path segment for the read-only iCalendar feed
-    -- (GET /api/calendar/[token]) that Google/Apple Calendar can subscribe
-    -- to — this token IS the auth, since calendar apps can't send our
-    -- session cookie. Not a UUID for its ID meaning, just 128 bits of
-    -- unguessable text.
-    calendar_token TEXT NOT NULL UNIQUE DEFAULT gen_random_uuid()::text,
     -- Set once a host clicks "Connect Google Calendar" (separate consent
     -- from login — see googleOAuth.ts). google_calendar_id is a *dedicated*
     -- calendar this app creates in their Google account (scope

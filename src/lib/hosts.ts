@@ -1,7 +1,7 @@
 import { query, queryOne } from "./db.ts";
 import type { Host } from "./types.ts";
 
-const HOST_COLUMNS = "id, email, name, whatsapp_number, notification_phone, calendar_token, google_calendar_id";
+const HOST_COLUMNS = "id, email, name, whatsapp_number, notification_phone, google_calendar_id";
 
 // Narrowed return type: this query's WHERE clause guarantees a match has a
 // non-null whatsapp_number, so callers (the WhatsApp webhook path) don't
@@ -18,10 +18,6 @@ export async function getHostById(id: string): Promise<Host | null> {
 
 export async function getHostByEmail(email: string): Promise<(Host & { password_hash: string | null }) | null> {
   return queryOne(`SELECT ${HOST_COLUMNS}, password_hash FROM hosts WHERE email = $1`, [email]);
-}
-
-export async function getHostByCalendarToken(token: string): Promise<Host | null> {
-  return queryOne<Host>(`SELECT ${HOST_COLUMNS} FROM hosts WHERE calendar_token = $1`, [token]);
 }
 
 /** Shared by the public signup route and scripts/create-host.ts — the only
